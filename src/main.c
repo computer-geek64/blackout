@@ -9,7 +9,6 @@
 #include <git2.h>
 #include "main.h"
 #include "censor_string.c"
-#include "undo_last_commit.c"
 
 
 int main(int argc, char **argv) {
@@ -36,7 +35,7 @@ int main(int argc, char **argv) {
     git_repository *repository = NULL;
     errorCode = git_repository_open(&repository, repositoryRoot);
     if(errorCode < 0) {
-        handleError(errorCode);
+        handleGitError(errorCode);
 
         // Cleanup
         git_repository_free(repository);
@@ -45,7 +44,9 @@ int main(int argc, char **argv) {
         return errorCode;
     }
 
-    errorCode = censorString("password", "********", repository);
+    //errorCode = censorString("password", "********", repository);
+    ReferenceList referenceList;
+    errorCode = getDirectReferences(&referenceList, repository);
     if(errorCode != 0) {
         git_repository_free(repository);
         free(repositoryRoot);
@@ -60,12 +61,12 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-
 int findRepositoryRoot(char **repositoryRoot, const char *repositoryPathArgument) {
     // Allocate memory for repositoryRootBuffer
     git_buf *repositoryRootBuffer = malloc(sizeof(repositoryRootBuffer));
     if(repositoryRootBuffer == NULL) {
-        printf("Memory allocation failure\n");
+        handleMemoryAllocationError();
+
         return 1;
     }
 
@@ -83,7 +84,7 @@ int findRepositoryRoot(char **repositoryRoot, const char *repositoryPathArgument
     // Copy repository root to string out pointer
     *repositoryRoot = malloc((strlen(repositoryRootBuffer->ptr) + 1) * sizeof(char));
     if(*repositoryRoot == NULL) {
-        printf("Memory allocation failure\n");
+        handleMemoryAllocationError();
 
         // Cleanup
         git_buf_dispose(repositoryRootBuffer);
@@ -97,15 +98,17 @@ int findRepositoryRoot(char **repositoryRoot, const char *repositoryPathArgument
     return 0;
 }
 
-
 int tree_walk_cb(const char *root, const git_tree_entry *entry, void *payload) {
     printf("\tFilename: %s\n", git_tree_entry_name(entry));
     printf("\tType: %s\n", git_object_type2string(git_tree_entry_type(entry)));
     return 0;
 }
 
-
-void handleError(int errorCode) {
+void handleGitError(int errorCode) {
     const git_error *e = git_error_last();
     printf("Error Code %d: %s\n", errorCode, e->message);
+}
+
+void handleMemoryAllocationError() {
+    printf("Memory allocation failure\n");
 }
