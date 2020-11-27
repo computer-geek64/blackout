@@ -11,7 +11,7 @@ all: blackout
 blackout: blackout.o
 	$(CC) $? -o $@ -lgit2
 
-blackout.o: src/main.c src/main.h src/censor_string.c src/censor_string.h src/undo_last_commit.c src/undo_last_commit.h
+blackout.o: src/main.c src/main.h src/censor_string.c src/censor_string.h src/clone_commits.c src/clone_commits.h
 	$(CC) -c $< -o $@
 
 clean:

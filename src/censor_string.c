@@ -2,7 +2,7 @@
 // Ashish D'Souza
 
 #include "censor_string.h"
-#include <git2.h>
+#include "clone_commits.c"
 
 
 typedef struct ReferenceList {
@@ -91,48 +91,6 @@ int censorString(const char *replace, const char *replacement, git_repository *r
     git_revwalk_free(walker);
 }
 
-/*int cloneCommits(int (*commitCallbackFunction)(), git_repository *repository) {
-    // Walk through revisions
-    git_revwalk *walker = NULL;
-    int errorCode = git_revwalk_new(&walker, repository);
-    if(errorCode < 0) {
-        handleGitError(errorCode);
-
-        // Cleanup
-        git_revwalk_free(walker);
-        return errorCode;
-    }
-
-    errorCode = git_revwalk_push_head(walker);
-    if(errorCode < 0) {
-        handleGitError(errorCode);
-
-        // Cleanup
-        git_revwalk_free(walker);
-        return errorCode;
-    }
-
-    git_oid commitOid;
-    while(git_revwalk_next(&commitOid, walker) == 0) {
-        git_commit *commit = NULL;
-        errorCode = git_commit_lookup(&commit, repository, &commitOid);
-        if(errorCode < 0) {
-            handleGitError(errorCode);
-
-            // Cleanup
-            git_commit_free(commit);
-            git_revwalk_free(walker);
-            return errorCode;
-        }
-
-        (*commitCallbackFunction)(*commit);
-    }
-}*/
-
-/*int commitCallback(git_commit commit) {
-    (void)(commit);
-    return 0;
-}*/
 
 int getDirectReferences(ReferenceList *referenceList, git_repository *repository) {
     git_strarray referenceNameList;
