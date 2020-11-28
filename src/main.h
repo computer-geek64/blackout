@@ -6,8 +6,9 @@
 
 int main(int argc, char **argv);
 int findRepositoryRoot(char **repositoryRoot, const char *repositoryPathArgument);
-int tree_walk_cb(const char *root, const git_tree_entry *entry, void *payload);
 void handleGitError(int errorCode);
 void handleMemoryAllocationError();
+int isCommitUpdateRequired(int *condition, git_commit *commit);
+int commitCallback(git_commit **commit, CommitList commitList, git_repository*);
 
 #endif

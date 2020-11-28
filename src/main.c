@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <git2.h>
+#include "structs.c"
 #include "main.h"
 #include "censor_string.c"
 
@@ -49,6 +50,17 @@ int main(int argc, char **argv) {
     ReferenceList referenceList;
     errorCode = getDirectReferences(&referenceList, repository);
     if(errorCode != 0) {
+        git_repository_free(repository);
+        free(repositoryRoot);
+        git_libgit2_shutdown();
+        return errorCode;
+    }
+
+    printf("Cloning commits now...");
+
+    errorCode = cloneCommitsFromHead(repository, &isCommitUpdateRequired, &commitCallback);
+    if(errorCode) {
+        // Cleanup
         git_repository_free(repository);
         free(repositoryRoot);
         git_libgit2_shutdown();
@@ -99,12 +111,6 @@ int findRepositoryRoot(char **repositoryRoot, const char *repositoryPathArgument
     return 0;
 }
 
-int tree_walk_cb(const char *root, const git_tree_entry *entry, void *payload) {
-    printf("\tFilename: %s\n", git_tree_entry_name(entry));
-    printf("\tType: %s\n", git_object_type2string(git_tree_entry_type(entry)));
-    return 0;
-}
-
 void handleGitError(int errorCode) {
     const git_error *e = git_error_last();
     printf("Error Code %d: %s\n", errorCode, e->message);
@@ -112,4 +118,30 @@ void handleGitError(int errorCode) {
 
 void handleMemoryAllocationError() {
     printf("Memory allocation failure\n");
+}
+
+int isCommitUpdateRequired(int *condition, git_commit *commit) {
+    *condition = TRUE;
+    (void)(commit);
+    return 0;
+}
+
+int commitCallback(git_commit **commit, CommitList commitList, git_repository *repository) {
+    // Rewrites commit message
+    git_oid newCommitOid;
+    git_tree *oldCommitTree;
+    int errorCode = git_commit_tree(&oldCommitTree, *commit);
+    if(errorCode < 0) {
+        handleGitError(errorCode);
+
+        // Cleanup
+        git_tree_free(oldCommitTree);
+        return errorCode;
+    }
+
+    const char* message = "This commit message has been overwritten.";
+    git_commit_create(&newCommitOid, repository, NULL, git_commit_author(*commit), git_commit_committer(*commit), git_commit_message_encoding(*commit), message, oldCommitTree, commitList.size, commitList.size > 0 ? commitList.list : NULL);
+    git_commit_lookup(commit, repository, &newCommitOid);
+
+    return 0;
 }
