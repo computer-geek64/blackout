@@ -15,20 +15,12 @@
 
 
 int main(int argc, char **argv) {
-    // Check if argv has string
-    if(argc < 2) {
-        printf("No repository path specified\n");
-        return 1;
-    }
-
-    const char *repositoryPathArgument = *(argv + 1);
-
     // Initialize libgit2
     git_libgit2_init();
 
     // Find git repository root path
     char *repositoryRoot;
-    int errorCode = findRepositoryRoot(&repositoryRoot, repositoryPathArgument);
+    int errorCode = findRepositoryRoot(&repositoryRoot, ".");
     if(errorCode != 0) {
         git_libgit2_shutdown();
         return errorCode;
@@ -47,7 +39,7 @@ int main(int argc, char **argv) {
         return errorCode;
     }
 
-    if(argc < 4) {
+    if(argc < 3) {
         printf("No search/replacement text specified\n");
 
         // Cleanup
@@ -58,7 +50,7 @@ int main(int argc, char **argv) {
     }
 
     // Censor string
-    errorCode = censorString(*(argv + 2), *(argv + 3), repository);
+    errorCode = censorString(*(argv + 1), *(argv + 2), repository);
     if(errorCode != 0) {
         // Cleanup
         git_object_free((git_object*) repository); // Solves occasional "malloc_consolidate(): invalid chunk size" errors by not using git_repository_free
