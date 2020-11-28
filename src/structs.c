@@ -20,6 +20,16 @@ typedef struct CommitList {
     size_t size;
 } CommitList;
 
+typedef struct CommitMap {
+    CommitMapping *list;
+    size_t size;
+} CommitMap;
+
+typedef struct CommitMapping {
+    const git_oid *oldCommitOid;
+    const git_oid *newCommitOid;
+} CommitMapping;
+
 void destroyReferenceList(ReferenceList referenceList) {
     for(unsigned int i = 0; i < referenceList.size; i++) {
         free(referenceList.list[i].name);
@@ -33,4 +43,8 @@ void destroyCommitList(CommitList commitList) {
         git_commit_free((git_commit*) commitList.list[i]);
     }
     free(commitList.list);
+}
+
+void destroyCommitMap(CommitMap commitMap) {
+    free(commitMap.list);
 }

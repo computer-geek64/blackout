@@ -43,31 +43,46 @@ int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequire
         return errorCode;
     }
 
+    // Get commit map
+    CommitMap commitMap = {NULL, 0};
+
     // Clone commits from HEAD
-    errorCode = cloneCommitsFromHeadHelper(&head, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
+    errorCode = cloneCommitsFromHeadHelper(&head, referenceList, &commitMap, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
     if(errorCode != 0) {
         // Cleanup
+        destroyCommitMap(commitMap);
         destroyReferenceList(referenceList);
         git_commit_free(head);
         return errorCode;
     }
-
-    git_commit_free(head);
 
     // Update working tree and index to current head commit
     git_checkout_options checkoutOptions;
     git_checkout_options_init(&checkoutOptions, GIT_CHECKOUT_OPTIONS_VERSION);
     checkoutOptions.checkout_strategy = GIT_CHECKOUT_FORCE;
     git_checkout_head(repository, &checkoutOptions);
+
+    // Cleanup
+    destroyCommitMap(commitMap);
+    destroyReferenceList(referenceList);
+    git_commit_free(head);
     return 0;
 }
 
 // Recursive commit Directed Acyclic Graph (DAG) parser and cloner
-int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList, git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
+int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList, CommitMap *commitMap, git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
     /* Get parents of current commit
      * Call cloneCommitsFromHeadHelper recursively on each parent
      * Clone current commit if current commit meets expectations or if parents were cloned (using parent commits)
      */
+
+    // Check if commit was already cloned
+    for(unsigned int i = 0; i < commitMap->size; i++) {
+        if(strcmp(git_oid_tostr_s(commitMap->list[i].oldCommitOid), git_oid_tostr_s(git_commit_id(*commit))) == 0) {
+            git_commit_lookup(commit, repository, commitMap->list[i].newCommitOid);
+            return 0;
+        }
+    }
 
     // Get parents of current commit
     const size_t parentCount = git_commit_parentcount(*commit);
@@ -103,7 +118,7 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
 
         // Recursively get new parents
         git_commit *oldParentCommit = parentCommit;
-        errorCode = cloneCommitsFromHeadHelper(&parentCommit, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
+        errorCode = cloneCommitsFromHeadHelper(&parentCommit, referenceList, commitMap, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
         if(errorCode != 0) {
             // Cleanup
             git_commit_free(parentCommit);
@@ -135,6 +150,27 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
             return errorCode;
         }
 
+
+        // Add to commit mapping
+        CommitMapping *listRealloc = (CommitMapping*) realloc(commitMap->list, (commitMap->size + 1) * sizeof(CommitMapping));
+        if(listRealloc == NULL) {
+            handleMemoryAllocationError();
+
+            // Cleanup
+            destroyCommitMap(*commitMap);
+            if(oldCommit != *commit) {
+                git_commit_free(*commit);
+                *commit = oldCommit;
+            }
+            destroyCommitList(commitList);
+            return errorCode;
+        }
+        commitMap->list = listRealloc;
+
+        CommitMapping commitMapping = {git_commit_id(oldCommit), git_commit_id(*commit)};
+        commitMap->list[commitMap->size] = commitMapping;
+        commitMap->size++;
+
         // Update any refs
         updateCommitRefs(oldCommit, *commit, referenceList, repository);
         git_commit_free(oldCommit);
@@ -156,11 +192,33 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
         git_commit_create(&newCommitOid, repository, NULL, git_commit_author(*commit), git_commit_committer(*commit), git_commit_message_encoding(*commit), git_commit_message(*commit), oldCommitTree, parentCount, commitList.list);
         git_commit_lookup(commit, repository, &newCommitOid);
 
+        // Add to commit mapping
+        CommitMapping *listRealloc = (CommitMapping*) realloc(commitMap->list, (commitMap->size + 1) * sizeof(CommitMapping));
+        if(listRealloc == NULL) {
+            handleMemoryAllocationError();
+
+            // Cleanup
+            destroyCommitMap(*commitMap);
+            if(oldCommit != *commit) {
+                git_commit_free(*commit);
+                *commit = oldCommit;
+            }
+            destroyCommitList(commitList);
+            return errorCode;
+        }
+        commitMap->list = listRealloc;
+
+        CommitMapping commitMapping = {git_commit_id(oldCommit), git_commit_id(*commit)};
+        commitMap->list[commitMap->size] = commitMapping;
+        commitMap->size++;
+
         // Update any refs
         updateCommitRefs(oldCommit, *commit, referenceList, repository);
         git_commit_free(oldCommit);
     }
 
+    // Cleanup
+    destroyCommitList(commitList);
     return 0;
 }
 

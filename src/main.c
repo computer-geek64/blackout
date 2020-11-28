@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
     // Censor string
     errorCode = censorString(*(argv + 2), *(argv + 3), repository);
-    if(errorCode) {
+    if(errorCode != 0) {
         // Cleanup
         git_repository_free(repository);
         free(repositoryRoot);

@@ -118,24 +118,6 @@ int replaceStringInCommitBlobs(git_commit **commit, CommitList commitList, git_r
     git_tree_free(newTree);
     git_tree_free(tree);
     return 0;
-
-    /*// Rewrites commit message
-    git_oid newCommitOid;
-    git_tree *oldCommitTree;
-    int errorCode = git_commit_tree(&oldCommitTree, *commit);
-    if(errorCode < 0) {
-        handleGitError(errorCode);
-
-        // Cleanup
-        git_tree_free(oldCommitTree);
-        return errorCode;
-    }
-
-    const char* message = "This commit message has been overwritten.";
-    git_commit_create(&newCommitOid, repository, NULL, git_commit_author(*commit), git_commit_committer(*commit), git_commit_message_encoding(*commit), message, oldCommitTree, commitList.size, commitList.size > 0 ? commitList.list : NULL);
-    git_commit_lookup(commit, repository, &newCommitOid);
-
-    return 0;*/
 }
 
 int isStringInCommitBlobsCallback(const char *root, const git_tree_entry *entry, void *payload) {
