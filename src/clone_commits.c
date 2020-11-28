@@ -2,45 +2,15 @@
 // Ashish D'Souza
 
 #include "clone_commits.h"
+#include <git2.h>
 
 
 int cloneCommits(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
-    // Walk through revisions
-    git_revwalk *walker = NULL;
-    int errorCode = git_revwalk_new(&walker, repository);
-    if(errorCode < 0) {
-        handleGitError(errorCode);
-
-        // Cleanup
-        git_revwalk_free(walker);
-        return errorCode;
-    }
-
-    errorCode = git_revwalk_push_head(walker);
-    if(errorCode < 0) {
-        handleGitError(errorCode);
-
-        // Cleanup
-        git_revwalk_free(walker);
-        return errorCode;
-    }
-
-    git_oid commitOid;
-    while(git_revwalk_next(&commitOid, walker) == 0) {
-        git_commit *commit = NULL;
-        errorCode = git_commit_lookup(&commit, repository, &commitOid);
-        if(errorCode < 0) {
-            handleGitError(errorCode);
-
-            // Cleanup
-            git_commit_free(commit);
-            git_revwalk_free(walker);
-            return errorCode;
-        }
-
-        int bool = TRUE;
-        //*commitCallbackFunction(&commit, NULL);
-    }
+    (void)(repository);
+    (void)(isCommitUpdateRequiredFunction);
+    (void)(commitCallbackFunction);
+    (void)(payload);
+    return 0;
 }
 
 int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
@@ -85,7 +55,10 @@ int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequire
     git_commit_free(head);
 
     // Update working tree and index to current head commit
-    git_checkout_head(repository, NULL);
+    git_checkout_options checkoutOptions;
+    git_checkout_options_init(&checkoutOptions, GIT_CHECKOUT_OPTIONS_VERSION);
+    checkoutOptions.checkout_strategy = GIT_CHECKOUT_FORCE;
+    git_checkout_head(repository, &checkoutOptions);
     return 0;
 }
 
