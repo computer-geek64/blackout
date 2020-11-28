@@ -4,7 +4,7 @@
 #include "clone_commits.h"
 
 
-int cloneCommits(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*)) {
+int cloneCommits(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
     // Walk through revisions
     git_revwalk *walker = NULL;
     int errorCode = git_revwalk_new(&walker, repository);
@@ -43,7 +43,7 @@ int cloneCommits(git_repository *repository, int (*isCommitUpdateRequiredFunctio
     }
 }
 
-int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*)) {
+int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
     // Get HEAD commit
     git_oid oid;
     int errorCode = git_reference_name_to_id(&oid, repository, "HEAD");
@@ -74,7 +74,7 @@ int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequire
     }
 
     // Clone commits from HEAD
-    errorCode = cloneCommitsFromHeadHelper(&head, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction);
+    errorCode = cloneCommitsFromHeadHelper(&head, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
     if(errorCode != 0) {
         // Cleanup
         destroyReferenceList(referenceList);
@@ -89,11 +89,12 @@ int cloneCommitsFromHead(git_repository *repository, int (*isCommitUpdateRequire
     return 0;
 }
 
-int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList, git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*)) {
-    // get parents of current commit
-    // call cloneCommitsFromHeadHelper recursively on each parent
-    // check if parents needed cloning
-    // clone current commit if current commit meets expectations or if parents were cloned (using parent commits)
+// Recursive commit Directed Acyclic Graph (DAG) parser and cloner
+int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList, git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
+    /* Get parents of current commit
+     * Call cloneCommitsFromHeadHelper recursively on each parent
+     * Clone current commit if current commit meets expectations or if parents were cloned (using parent commits)
+     */
 
     // Get parents of current commit
     const size_t parentCount = git_commit_parentcount(*commit);
@@ -107,12 +108,17 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
     }
 
     int commitUpdateRequired;
-    isCommitUpdateRequired(&commitUpdateRequired, *commit);
+    int errorCode = (*isCommitUpdateRequiredFunction)(&commitUpdateRequired, *commit, repository, payload);
+    if(errorCode != 0) {
+        // Cleanup
+        destroyCommitList(commitList);
+        return errorCode;
+    }
     int parentCommitUpdated = FALSE;
 
     for(; commitList.size < parentCount; commitList.size++) {
         git_commit *parentCommit;
-        int errorCode = git_commit_parent(&parentCommit, *commit, commitList.size);
+        errorCode = git_commit_parent(&parentCommit, *commit, commitList.size);
         if(errorCode < 0) {
             handleGitError(errorCode);
 
@@ -124,7 +130,7 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
 
         // Recursively get new parents
         git_commit *oldParentCommit = parentCommit;
-        errorCode = cloneCommitsFromHeadHelper(&parentCommit, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction);
+        errorCode = cloneCommitsFromHeadHelper(&parentCommit, referenceList, repository, isCommitUpdateRequiredFunction, commitCallbackFunction, payload);
         if(errorCode != 0) {
             // Cleanup
             git_commit_free(parentCommit);
@@ -145,7 +151,7 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
     if(commitUpdateRequired) {
         // Update current commit with new data
         git_commit *oldCommit = *commit;
-        int errorCode = (*commitCallbackFunction)(commit, commitList, repository);
+        errorCode = (*commitCallbackFunction)(commit, commitList, repository, payload);
         if(errorCode != 0) {
             // Cleanup
             if(oldCommit != *commit) {
@@ -165,7 +171,7 @@ int cloneCommitsFromHeadHelper(git_commit **commit, ReferenceList referenceList,
         git_commit *oldCommit = *commit;
         git_oid newCommitOid;
         git_tree *oldCommitTree;
-        int errorCode = git_commit_tree(&oldCommitTree, *commit);
+        errorCode = git_commit_tree(&oldCommitTree, *commit);
         if(errorCode < 0) {
             handleGitError(errorCode);
 
@@ -262,7 +268,6 @@ int getDirectReferences(ReferenceList *referenceList, git_repository *repository
 
             referenceList->list[referenceList->size].oid = *commitOid;
 
-            printf("%s: %s\n", referenceList->list[referenceList->size].name, referenceList->list[referenceList->size].commit);
             referenceList->size++;
         }
 
