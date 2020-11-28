@@ -61,14 +61,14 @@ int main(int argc, char **argv) {
     errorCode = censorString(*(argv + 2), *(argv + 3), repository);
     if(errorCode != 0) {
         // Cleanup
-        git_repository_free(repository);
+        git_object_free((git_object*) repository); // Solves occasional "malloc_consolidate(): invalid chunk size" errors by not using git_repository_free
         free(repositoryRoot);
         git_libgit2_shutdown();
         return errorCode;
     }
 
     // Cleanup
-    git_repository_free(repository);
+    git_object_free((git_object*) repository); // Solves occasional "malloc_consolidate(): invalid chunk size" errors by not using git_repository_free
     free(repositoryRoot);
     git_libgit2_shutdown();
     return 0;
