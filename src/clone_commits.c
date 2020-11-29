@@ -2,8 +2,6 @@
 // Ashish D'Souza
 
 #include "clone_commits.h"
-#include <git2.h>
-
 
 int cloneCommits(git_repository *repository, int (*isCommitUpdateRequiredFunction)(int*, git_commit*, git_repository*, void*), int (*commitCallbackFunction)(git_commit**, CommitList, git_repository*, void*), void *payload) {
     (void)(repository);
