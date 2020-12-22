@@ -40,7 +40,7 @@ The current stable release for **Blackout** is [v1.0.0](https://github.com/compu
 
 ## Versioning
 
-This project is uses the [Git](https://git-scm.com/) Version Control System (VCS).
+This project uses the [Git](https://git-scm.com/) Version Control System (VCS).
 
 ## License
 
